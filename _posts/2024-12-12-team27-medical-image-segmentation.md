@@ -1,13 +1,13 @@
 ---
 layout: post
 comments: true
-title: Post Template
-author: UCLAdeepvision
-date: 2024-01-01
+title: Medical Image Segmentation
+author: Om Patel, Suyeon Shin, Harkanwar Singh, Emmett Cocke
+date: 2024-12-12
 ---
 
 
-> This block is a brief introduction of your project. You can put your abstract here or any headers you want the readers to know.
+> This report covers medical image segmentation using U-Net, U-NET++, and PSPNet. These models are ran on ISIC and AMOS datasets. 
 
 
 <!--more-->
@@ -15,50 +15,36 @@ date: 2024-01-01
 * TOC
 {:toc}
 
-## Main Content
-Your survey starts here. You can refer to the [source code](https://github.com/lilianweng/lil-log/tree/master/_posts) of [lil's blogs](https://lilianweng.github.io/lil-log/) for article structure ideas or Markdown syntax. We've provided a [sample post](https://ucladeepvision.github.io/CS188-Projects-2022Winter/2017/06/21/an-overview-of-deep-learning.html) from Lilian Weng and you can find the source code [here](https://raw.githubusercontent.com/UCLAdeepvision/CS188-Projects-2022Winter/main/_posts/2017-06-21-an-overview-of-deep-learning.md)
+## Introduction
+Medical image segmentation involves taking a medical image obtained from MRI/CT/etc. and segmenting different parts of the image. More specifically, given a 2D or 3D medical image, the goal is to produce a segmentation mask of the same dimension as the input. Labels in this mask correspond semantically to relevant parts of the image that are classified based on predefined classes. Some examples of classes include background, organ, and lesion. Unlike normal image classification tasks or most image segmentation tasks, medical image segmentation requires a very high level of accuracy. Radiologists who work with these images are trained for years to be able to accurately segment these images and identify lesions accurately. However, there are many more medical images than doctors that can make accurate diagnoses in the world, and so medical image segmentation attempts to solve this problem. Essentially, medical image segmentation aims to assist radiologists in detecting lesions from medical image scans and identifying regions of interest in an organ, reducing the amount of time radiologists may take to annotate these images. The models we will explore in this paper to implement this solution are U-Net, U-Net++, and PSPNet. 
 
-## Basic Syntax
-### Image
-Please create a folder with the name of your team id under /assets/images/, put all your images into the folder and reference the images in your main content.
-
-You can add an image to your survey like this:
-![YOLO]({{ '/assets/images/UCLAdeepvision/object_detection.png' | relative_url }})
-{: style="width: 400px; max-width: 100%;"}
-*Fig 1. YOLO: An object detection method in computer vision* [1].
-
-Please cite the image if it is taken from other people's work.
-
-
-### Table
-Here is an example for creating tables, including alignment syntax.
-
-|             | column 1    |  column 2     |
-| :---        |    :----:   |          ---: |
-| row1        | Text        | Text          |
-| row2        | Text        | Text          |
+## Dataset
+There are two datasets we will use in this model. One comes from ISIC (International Skin Imaging Collaboration).  
+## Model 1: U-Net
+### Architecture
+### Training
+### Results
+### Discussion
 
 
 
-### Code Block
-```
-# This is a sample code block
-import torch
-print (torch.__version__)
-```
+## Model 2: U-Net++
+### Architecture
+### Training
+### Results
+### Discussion
 
 
-### Formula
-Please use latex to generate formulas, such as:
 
-$$
-\tilde{\mathbf{z}}^{(t)}_i = \frac{\alpha \tilde{\mathbf{z}}^{(t-1)}_i + (1-\alpha) \mathbf{z}_i}{1-\alpha^t}
-$$
+## Model 3: TBD
+### Architecture
+### Training
+### Results
+### Discussion
 
-or you can write in-text formula $$y = wx + b$$.
 
-### More Markdown Syntax
-You can find more Markdown syntax at [this page](https://www.markdownguide.org/basic-syntax/).
+## Conclusion
+
 
 ## Reference
 Please make sure to cite properly in your work, for example:
