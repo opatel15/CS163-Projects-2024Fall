@@ -554,11 +554,106 @@ UNet++ demonstrates significant improvements over traditional UNet for medical s
 
 
 ## Model 3: PSPNet
-### Architecture
-### Training
-### Results
-### Discussion
+Semantic segmentation plays a critical role in computer vision and medical imaging by enabling precise delineation of regions of interest at the pixel level. Traditional segmentation approaches often struggle with capturing contextual information at multiple scales, which is crucial for accurately segmenting objects of varying sizes and shapes. In their paper Pyramid Scene Parsing Network [4], Zhao et al. proposed PSPNet, a deep learning model designed to enhance global context understanding by incorporating a Pyramid Pooling Module (PPM). This architecture was initially developed for scene parsing tasks but has shown great promise in medical image segmentation applications.
 
+### Architecture
+PSPNet builds upon a pre-trained deep convolutional neural network (e.g., ResNet) as its backbone to extract high-level features. The unique contribution of PSPNet lies in its Pyramid Pooling Module (PPM), which efficiently aggregates multi-scale contextual information. The architecture consists of the following components:
+
+- Backbone Network:
+    - PSPNet utilizes a standard CNN backbone (e.g., ResNet-50 or ResNet-101) to produce intermediate feature maps at reduced spatial dimensions, capturing essential semantic information.
+- Pyramid Pooling Module (PPM):
+    - The PPM pools features at multiple scales (e.g., 1×1, 2×2, 3×3, and 6×6 grid regions) to capture spatial context at different levels.
+    - The pooled features are upsampled to match the original feature map size.
+    - All pooled features are concatenated with the original feature map to produce a multi-scale representation.
+- Decoder and Output:
+    - A 1×1 convolution layer reduces the dimensionality of the concatenated features.
+    - A final softmax layer outputs pixel-wise class probabilities for segmentation.
+- Auxiliary Loss (Optional):
+    - To improve training stability, an auxiliary loss function is applied to intermediate features extracted from the backbone.
+
+Overall, the model minimizes a pixel-wise cross-entropy loss, with auxiliary supervision optionally added to aid convergence.
+
+### Code Implementation
+```python
+class PyramidPoolingModule(nn.Module):
+    def __init__(self, in_channels, pool_sizes):
+        super(PyramidPoolingModule, self).__init__()
+        self.pool_sizes = pool_sizes
+        self.stages = nn.ModuleList([
+            nn.Sequential(
+                nn.AdaptiveAvgPool2d(output_size),
+                nn.Conv2d(in_channels, in_channels // len(pool_sizes), kernel_size=1, bias=False),
+                nn.BatchNorm2d(in_channels // len(pool_sizes)),
+                nn.ReLU(inplace=True)
+            ) for output_size in pool_sizes
+        ])
+        self.bottleneck = nn.Sequential(
+            nn.Conv2d(in_channels + in_channels // len(pool_sizes) * len(pool_sizes), in_channels, kernel_size=1, bias=False),
+            nn.BatchNorm2d(in_channels),
+            nn.ReLU(inplace=True)
+        )
+
+    def forward(self, x):
+        h, w = x.size(2), x.size(3)
+        pyramids = [x] + [F.interpolate(stage(x), size=(h, w), mode='bilinear', align_corners=False) for stage in self.stages]
+        output = torch.cat(pyramids, dim=1)
+        return self.bottleneck(output)
+
+class PSPNet(nn.Module):
+    def __init__(self, num_classes, backbone_features=512, pool_sizes=[1, 2, 3, 6]):
+        super(PSPNet, self).__init__()
+        self.encoder = nn.Sequential(
+            nn.Conv2d(3, backbone_features // 2, kernel_size=3, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(backbone_features // 2),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(backbone_features // 2, backbone_features, kernel_size=3, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(backbone_features),
+            nn.ReLU(inplace=True)
+        )
+
+        self.pyramid_pooling = PyramidPoolingModule(backbone_features, pool_sizes)
+
+        self.decoder = nn.Sequential(
+            nn.Conv2d(backbone_features, 256, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(256),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(256, num_classes, kernel_size=1)
+        )
+
+    def forward(self, x):
+        h, w = x.size(2), x.size(3)
+        x = self.encoder(x)
+        x = self.pyramid_pooling(x)
+        x = self.decoder(x)
+        x = F.interpolate(x, size=(h, w), mode='bilinear', align_corners=False)  # Upsample to original size
+        return x
+```
+
+### Training
+The PSPNet was  trained on a training portion of the ISIC 2017 dataset contianing 2000 images and ground truth masks. We had the following hyperparameters for training:
+- **Image Dimensions**: Height = 767, Width = 1022 (dataset images were this size)
+- **Batch Size**: 4
+- **Learning Rate**: 1e-3
+- **Optimizer**: Adam
+- **Loss Function**: Binary Cross Entropy with Logits (BCEWithLogitsLoss)
+- **Number of Epochs**: 20
+- **In-channels/Out-channels**: 3/1
+
+### Results
+On the test set, PSPNet scored:
+- **Mean Dice Coefficient on Test Set:** 0.6857
+- **Mean IoU on Test Set:** 0.5857
+
+#### Prediction
+![PSPNet Result]({{ '/assets/images/27/pspnet_results.png' | relative_url }})
+<!-- {: style="width: 400px; max-width: 100%;"} -->
+
+### Discussion
+PSPNet demonstrates a solid performance in medical image segmentation, thanks to its innovative Pyramid Pooling Module (PPM) that aggregates multi-scale contextual information. The ability to capture global context is particularly beneficial in medical imaging, where lesions, abnormalities, and anatomical features often vary significantly in size, shape, and appearance.
+
+The model's test set results, with a Mean Dice Coefficient of 0.6857 and a Mean IoU of 0.5857, highlight its effectiveness compared to baseline methods but also reveal some limitations relative to UNet++. While PSPNet outperforms the original UNet, it does not quite achieve the fine-grained accuracy of UNet++, as seen in the slightly lower Dice and IoU scores.
+
+From a qualitative perspective, PSPNet's predictions are robust in delineating boundaries and capturing essential features, particularly for lesions with relatively distinct edges. However, a potential drawback is its computational complexity, stemming from the multi-scale pooling operations and the use of high-capacity backbone networks like ResNet.
 
 ## Conclusion
 
@@ -574,5 +669,6 @@ A nested U-Net architecture for medical image segmentation,” in
 Proc. Int. Workshop Deep Learn. Med. Image Anal. Multimodal Learn.
 Clin. Decis. Support, 2018, pp. 3–11.
 
+[4] Hengshuang Zhao, Jianping Shi, Xiaojuan Qi, Xiaogang Wang, Jiaya Jia. "Pyramid Scene Parking Network". arXiv:1612.01105
 
 ---
