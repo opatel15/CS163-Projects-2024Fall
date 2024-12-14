@@ -27,14 +27,19 @@ To evaluate the architectures described in the three papers on a single dataset,
 #### Mean IoU
 Mean Intersection over Union (IoU) is the overlap between the predicted and ground truth segmentation masks over all test samples. Each IoU can be found by:
 
-$\text{IoU} = \frac{\text{Intersection of Predicted and Ground Truth}}{\text{Union of Predicted and Ground Truth}}$
+$$
+\text{IoU} = \frac{\text{Intersection of Predicted and Ground Truth}}{\text{Union of Predicted and Ground Truth}}
+$$
 
 This gives a measure of the model's segmentation accuracy.
 
 ### Mean Dice Coefficient
 Mean Dice coefficient is the similarity between the predicted and ground truth masks over all test samples and a single score can be found with:
 
-$\text{Dice} = \frac{2 \times |\text{Intersection of Predicted and Ground Truth}|}{|\text{Predicted}| + |\text{Ground Truth}|}$
+$$
+\text{Dice} = \frac{2 \times |\text{Intersection of Predicted and Ground Truth}|}{|\text{Predicted}| + |\text{Ground Truth}|}
+$$
+
 
 The closer to 1 the better overlap.
 
@@ -116,7 +121,7 @@ class GradCAM:
 The earliest segmentation model we evaluated is U-Net, a convolutional neural network architecture designed specifically for biomedical image segmentation although today U-Net is being used for many different tasks. 
 
 ### Architecture
-![unet-diagram](../assets/images/27/unet-diagram.png)
+![unet-diagram]({{ '/assets/images/27/unet-diagram.png' | relative_url }})
 <br>
 *U-Net Architecture diagram from [2]*
 
@@ -250,7 +255,7 @@ On the test set, U-Net scored:
 - **Mean Dice Coefficient on Test Set:** 0.6695
 - **Mean IoU on Test Set:** 0.5642
 
-![unet-results](../assets/images/27/unet-results.png)
+![unet-results]({{ '/assets/images/27/unet-results.png' | relative_url }})
 <br>
 *Four samples with their ground truth and U-Net prediction segmentation masks*
 
@@ -266,7 +271,7 @@ The above metrics provide and image vs ground truth vs prediction give a  quanti
    - CAM visualizes the pixel-wise decision-making of the final layer, which produces the segmentation map.
    - The heatmap shows strong activation in regions corresponding to the lesion, with minimal attention to the surrounding healthy skin.
 
-![plot of CAM and Grad-CAM](../assets/images/27/grad-cam-unet.png)
+![plot of CAM and Grad-CAM]({{ '/assets/images/27/grad-cam-unet.png' | relative_url }})
 <br>
 *Input, predicted, CAM, and Grad-CAM visualization plot*
 
@@ -278,7 +283,7 @@ It is hopefully clear why the U-Net structure is the way it is given the above p
 
 While the IoU score seems low, its hard to see this lacking qualitatively. Below is an plot with U-Net's segmentation of four input images. From a human perspective, the model appears to capture the essential features and boundaries effectively which is the main motivation behind medical image segmenation. Also here we can see U-Nets IoU scores from the original paper from another segmentation competition on cell segmentation compared to 4 other methods:
 
-![example from paper of U-Net IoU](../assets/images/27/unet-paper-iou.png)
+![example from paper of U-Net IoU]({{ '/assets/images/27/unet-paper-iou.png' | relative_url }} )
 <br>
 *IoU scores of U-Net compared to other methods on a cell segmentation task [2].*
 
@@ -295,6 +300,8 @@ UNet++ builds upon the standard UNet architecture by introducing **nested dense 
 In the UNet architecture, the encoder extracts spatially fine-grained but semantically shallow features, while the decoder focuses on semantically rich but spatially coarse features. The direct fusion of these features via skip connections often results in a mismatch, leading to suboptimal performance. UNet++ tackles this issue by introducing intermediate dense convolutional blocks along the skip pathways, which progressively refine the encoder’s feature maps before merging them with the decoder.
 
 ![Architecture]({{ '/assets/images/27/arch.png' | relative_url }})
+<br>
+*U-Net++ Architecture diagram from [3]*
 
 #### Key Features of UNet++
 
@@ -302,6 +309,9 @@ In the UNet architecture, the encoder extracts spatially fine-grained but semant
    UNet++ replaces the plain skip connections of UNet with nested dense convolutional blocks. These blocks bridge the semantic gap between encoder and decoder feature maps by refining them through multiple convolutional layers. Each dense block combines outputs from earlier layers and upsampled features, ensuring better feature fusion.
 
 ![Forward]({{ '/assets/images/27/forward.png' | relative_url }})
+<br>
+*U-Net++ Architecture diagram from [3]*
+
 
 - **Deep Supervision**:
    UNet++ enables deep supervision by generating outputs at multiple levels of the decoder. This approach ensures better gradient flow during training and allows the model to operate in two modes during inference:
@@ -309,8 +319,11 @@ In the UNet architecture, the encoder extracts spatially fine-grained but semant
    - **Fast Mode**: Uses a single decoder level for quicker inference, trading off some accuracy for speed.
 
 ![DeepSupervision]({{ '/assets/images/27/deep_supervision.png' | relative_url }})
+<br>
+*U-Net++ Training diagram from [3]*
 
-#### Implementation
+
+### Code Implementation
 
 Below is a basic implementation of the UNet++ architecture (replace this placeholder with the provided code):
 
@@ -410,8 +423,6 @@ class NestedUNet(nn.Module):
 ### Training
 
 Training UNet++ involves carefully balancing the challenges of pixel-level accuracy and overall segmentation shape coherence. To achieve this, the training process leverages a **combined loss function** that integrates **Binary Cross-Entropy (BCE)** and **Dice Loss**. Let’s explore these components and their implementation in the training pipeline.
-
-
 
 #### Combined Loss Function
 
@@ -529,24 +540,17 @@ The performance of the UNet++ model was evaluated using two key metrics: the **M
 1. **Dice Coefficient (DSC):** Measures the overlap between predicted and ground truth masks. A higher value indicates better segmentation.
 2. **Intersection over Union (IoU):** Computes the ratio of the intersection and union of predicted and ground truth masks. 
 
-
-| Metric                  | Score   |
-| :----------------------- | :-----: |
-| **Mean Dice Coefficient** | 0.7839 |
-| **Mean IoU**             | 0.6854 |
-
-
-
+On the test set, U-Net++ scored:
+- **Mean Dice Coefficient on Test Set:** 0.7839
+- **Mean IoU on Test Set:** 0.6854
 
 #### Prediction
 
 ![Segmentation Result]({{ '/assets/images/27/results.png' | relative_url }})
 <!-- {: style="width: 400px; max-width: 100%;"} -->
 
-#### Discussion
-UNet++ demonstrates significant improvements over traditional UNet for medical segmentation tasks, owing to its architectural innovations and advanced training strategies. With its ability to generate accurate and reliable segmentations, it remains a powerful tool in the domain of medical image analysis.
-
-
+### Discussion
+UNet++ demonstrates significant improvements over traditional UNet for medical segmentation tasks, owing to its architectural innovations and advanced training strategies. With its ability to generate accurate and reliable segmentations, it shows significant improvement from UNet in IoU score from 0.5642 to 0.6854 and same for DICE score. Also the predictions as shown above are fine grained and precise.
 
 
 ## Model 3: PSPNet
@@ -564,5 +568,11 @@ UNet++ demonstrates significant improvements over traditional UNet for medical s
 [1]  Codella N, Gutman D, Celebi ME, Helba B, Marchetti MA, Dusza S, Kalloo A, Liopyris K, Mishra N, Kittler H, Halpern A. "Skin Lesion Analysis Toward Melanoma Detection: A Challenge at the 2017 International Symposium on Biomedical Imaging (ISBI), Hosted by the International Skin Imaging Collaboration (ISIC)". arXiv: 1710.05006 
 
 [2] Ronneberger O, Fischer P, Brox T. "U-Net: Convolutional Networks for Biomedical Image Segmentation". arXiv: 1505.04597.
+
+[3] Z. Zhou, M. M. R. Siddiquee, N. Tajbakhsh, and J. Liang, “UNet++:
+A nested U-Net architecture for medical image segmentation,” in
+Proc. Int. Workshop Deep Learn. Med. Image Anal. Multimodal Learn.
+Clin. Decis. Support, 2018, pp. 3–11.
+
 
 ---
