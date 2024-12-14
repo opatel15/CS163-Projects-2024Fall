@@ -7,7 +7,7 @@ date: 2024-12-12
 ---
 
 
-> This report covers medical image segmentation using U-Net, U-NET++, and PSPNet. These models are ran on ISIC and AMOS datasets. 
+> This report covers medical image segmentation using U-Net, U-NET++, and PSPNet. These models are ran on an ISIC challenge dataset from 2017.  
 
 
 <!--more-->
@@ -16,7 +16,11 @@ date: 2024-12-12
 {:toc}
 
 ## Introduction
-Medical image segmentation involves taking a medical image obtained from MRI/CT/etc. and segmenting different parts of the image. More specifically, given a 2D or 3D medical image, the goal is to produce a segmentation mask of the same dimension as the input. Labels in this mask correspond semantically to relevant parts of the image that are classified based on predefined classes. Some examples of classes include background, organ, and lesion. Unlike normal image classification tasks or most image segmentation tasks, medical image segmentation requires a very high level of accuracy. Radiologists who work with these images are trained for years to be able to accurately segment these images and identify lesions accurately. However, there are many more medical images than doctors that can make accurate diagnoses in the world, and so medical image segmentation attempts to solve this problem. Essentially, medical image segmentation aims to assist radiologists in detecting lesions from medical image scans and identifying regions of interest in an organ, reducing the amount of time radiologists may take to annotate these images. The models we will explore in this paper to implement this solution are U-Net, U-Net++, and PSPNet. 
+Medical image segmentation involves taking a medical image obtained from MRI/CT/etc. and segmenting different parts of the image. More specifically, given a 2D or 3D medical image, the goal is to produce a segmentation mask of the same dimension as the input. Labels in this mask correspond semantically to relevant parts of the image that are classified based on predefined classes. Some examples of classes include background, organ, and lesion. 
+
+Unlike normal image classification tasks or most image segmentation tasks, medical image segmentation requires a very high level of accuracy. Radiologists who work with these images are trained for years to be able to accurately segment these images and identify lesions accurately. However, there are many more medical images than doctors that can make accurate diagnoses in the world, and so medical image segmentation attempts to solve this problem. Essentially, medical image segmentation aims to assist radiologists in detecting lesions from medical image scans and identifying regions of interest in an organ, reducing the amount of time radiologists may take to annotate these images. 
+
+The models we will explore in this paper to implement this solution are U-Net, U-Net++, and PSPNet. The implementations of these models are inspired by existing codebases that implemented them. The results that come out of these models will be quantitatively evaluated using the IoU and DICE score metrics. In addition to this, to better aid in the visual understanding of how these images are segmented, we will implement Grad-CAM and CAM. These will show which regions of the input contributed to the model's predictions at different layers of the model. We will apply Grad-CAM and CAM to U-Net. 
 
 ## Dataset
 The dataset used for this paper comes from ISIC (International Skin Imaging Collaboration), specifically the ISIC challenge dataset from 2017 [1]. The training dataset consists of 2000 skin lesion images in JPEG format and 2000 superpixel masks in PNG format. The ground truth training data consists of 2000 binary mask images in PNG format, 2000 dermoscopic feature files in JSON format, and 2000 lesion diagnoses. The goal of this dataset was train models to accurately diagnose melanoma. The challenge using this dataset involved segmenting images, feature detection, and disease classification. For the purposes of this paper, we will only focus on segmenting medical images, meaning we will not be using the 2000 dermoscopic feature files and 2000 lesion diagnoses. 
@@ -125,7 +129,7 @@ The earliest segmentation model we evaluated is U-Net, a convolutional neural ne
 <br>
 *U-Net Architecture diagram from [2]*
 
-The most prominent features of U-Net's architectue are its shape and its skip connections. The shape is a result of the two halves of the down and up-sampling process and the passing of feature maps directly to later convolution layers:
+The most prominent features of U-Net's architecture are its shape and its skip connections. The shape is a result of the two halves of the down and up-sampling process and the passing of feature maps directly to later convolution layers:
 
 #### Encoder (Contracting Path)
 - Captures global context by progressively reducing the spatial dimensions of the input while extracting deeper semantic features.
@@ -259,7 +263,7 @@ On the test set, U-Net scored:
 <br>
 *Four samples with their ground truth and U-Net prediction segmentation masks*
 
-The above metrics provide and image vs ground truth vs prediction give a  quantitative and qualitative measure of U-Net's segmentation performance but understanding the model's predictions and decision-making process requires squeezing some meaning out of model layers.
+The above metrics and qualitative comparison of image, ground truth segmentation, and predicted segmentation give a quantitative and qualitative measure of U-Net's segmentation performance but understanding the model's predictions and decision-making process requires squeezing some meaning out of model layers.
 
 #### Grad-CAM and CAM Analysis
 
@@ -281,7 +285,7 @@ It is hopefully clear why the U-Net structure is the way it is given the above p
 
 ### Discussion
 
-While the IoU score seems low, its hard to see this lacking qualitatively. Below is an plot with U-Net's segmentation of four input images. From a human perspective, the model appears to capture the essential features and boundaries effectively which is the main motivation behind medical image segmenation. Also here we can see U-Nets IoU scores from the original paper from another segmentation competition on cell segmentation compared to 4 other methods:
+While the IoU score seems low, its hard to see this lacking qualitatively. Below is an plot with U-Net's segmentation of four input images. From a human perspective, the model appears to capture the essential features and boundaries effectively which is the main motivation behind medical image segmenation. Also here we can see U-Net's IoU scores from the original paper from another segmentation competition on cell segmentation compared to 4 other methods:
 
 ![example from paper of U-Net IoU]({{ '/assets/images/27/unet-paper-iou.png' | relative_url }} )
 <br>
@@ -291,7 +295,7 @@ For harder problems like in segmenting lesions rather than cells which are alrea
 
 ## Model 2: U-Net++
 
-UNet++, an advanced extension of the UNet architecture, has proven effective in achieving high performance for medical segmentation tasks. The key innovations of UNet++, delves into its training process, and showcases results through evaluation metrics and visualizations.
+UNet++, an advanced extension of the UNet architecture, has proven effective in achieving high performance for medical segmentation tasks. This section delves into key innovations of UNet++, its training process, and showcases results through evaluation metrics and visualizations.
 
 ### Architecture
 
@@ -325,7 +329,7 @@ In the UNet architecture, the encoder extracts spatially fine-grained but semant
 
 ### Code Implementation
 
-Below is a basic implementation of the UNet++ architecture (replace this placeholder with the provided code):
+Below is a basic implementation of the UNet++ architecture:
 
 ```python
 class VGGBlock(nn.Module):
@@ -442,10 +446,9 @@ The combined loss is mathematically expressed as:
 
 #### Code for Loss
 
-Below is a code snippet illustrating the loss computation and training loop (replace this placeholder with the provided code):
+Below is a code snippet illustrating the loss computation and training loop:
 
 ```python
-# Placeholder for training loop with deep supervision
 import torch
 import torch.nn.functional as F
 from torch.nn import Module
@@ -550,7 +553,7 @@ On the test set, U-Net++ scored:
 <!-- {: style="width: 400px; max-width: 100%;"} -->
 
 ### Discussion
-UNet++ demonstrates significant improvements over traditional UNet for medical segmentation tasks, owing to its architectural innovations and advanced training strategies. With its ability to generate accurate and reliable segmentations, it shows significant improvement from UNet in IoU score from 0.5642 to 0.6854 and same for DICE score. Also the predictions as shown above are fine grained and precise.
+UNet++ demonstrates significant improvements over traditional UNet for medical segmentation tasks, owing to its architectural innovations and advanced training strategies. With its ability to generate accurate and reliable segmentations, it shows significant improvement from UNet in IoU score from 0.5642 to 0.6854 and 0.6695 to 0.7839 for DICE score. Also the predictions as shown above are slightly more fine grained and precise than U-Net, which is a reflection of the architectural improvements from U-Net to U-Net++.
 
 
 ## Model 3: PSPNet
@@ -630,7 +633,7 @@ class PSPNet(nn.Module):
 ```
 
 ### Training
-The PSPNet was  trained on a training portion of the ISIC 2017 dataset contianing 2000 images and ground truth masks. We had the following hyperparameters for training:
+The PSPNet was trained on a training portion of the ISIC 2017 dataset contianing 2000 images and ground truth masks. We had the following hyperparameters for training:
 - **Image Dimensions**: Height = 767, Width = 1022 (dataset images were this size)
 - **Batch Size**: 4
 - **Learning Rate**: 1e-3
@@ -656,7 +659,13 @@ The model's test set results, with a Mean Dice Coefficient of 0.6857 and a Mean 
 From a qualitative perspective, PSPNet's predictions are robust in delineating boundaries and capturing essential features, particularly for lesions with relatively distinct edges. However, a potential drawback is its computational complexity, stemming from the multi-scale pooling operations and the use of high-capacity backbone networks like ResNet.
 
 ## Conclusion
+All three models showed promising results at segmenting skin lesions, with U-Net++ being the best of the three. All three exhibited adequate IoU and DICE scores, especially conisdering training was only done for 20 epochs on each model. If run for more epochs, we expect that these models would approach similar IoU results to the model papers cited, making them much more viable in real world scenarios. 
 
+Qualitatively looking at the results of segmenting lesions, it is clear that the essential features and boundaries are clearly defined by these models, albeit not perfectly. Despite this flaw, the promise of using semantic segmentation in the medical field seems clear. A doctor could benefit from getting a second opinion from a model trained on 100x more images than most doctors will see in their lifetime, as these models are able to pick up complicated features quicker than humans can. 
+
+Currently, medical semantic segmentation and other deep learning approaches for tackling complex medical tasks are not widespread. One reason is the regulatory aspect, as it is difficult to verify that these models are safe enough to use for clinical decision support. The other more limiting reason is the lack of large generalizable datasets. Patients have unique coniditons and journeys, and their data is difficult to generate synthetically. Even if this data was able to be generated synthetically, some deep learning approaches run into walls when applying models trained on synthetic data, and eventually the need for generalizable real world data becomes unavoidable. 
+
+As deep learning models become more sophisticated and entrenched in tasks, models such as the ones discussed in this paper will become much more relevant and widespread, easing clinical research and clinical decision support. 
 
 ## Reference
 
