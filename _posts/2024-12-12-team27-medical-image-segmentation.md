@@ -285,10 +285,267 @@ While the IoU score seems low, its hard to see this lacking qualitatively. Below
 For harder problems like in segmenting lesions rather than cells which are already fairly distinct from nearby structures, a score of 0.5642 is good. 
 
 ## Model 2: U-Net++
+
+UNet++, an advanced extension of the UNet architecture, has proven effective in achieving high performance for medical segmentation tasks. The key innovations of UNet++, delves into its training process, and showcases results through evaluation metrics and visualizations.
+
 ### Architecture
+
+UNet++ builds upon the standard UNet architecture by introducing **nested dense skip connections** and **deep supervision**. These enhancements address the inherent limitations of UNet, particularly the semantic gap between encoder and decoder features.
+
+In the UNet architecture, the encoder extracts spatially fine-grained but semantically shallow features, while the decoder focuses on semantically rich but spatially coarse features. The direct fusion of these features via skip connections often results in a mismatch, leading to suboptimal performance. UNet++ tackles this issue by introducing intermediate dense convolutional blocks along the skip pathways, which progressively refine the encoder’s feature maps before merging them with the decoder.
+
+![Architecture]({{ '/assets/images/27/arch.png' | relative_url }})
+
+#### Key Features of UNet++
+
+- **Nested Dense Skip Connections**:
+   UNet++ replaces the plain skip connections of UNet with nested dense convolutional blocks. These blocks bridge the semantic gap between encoder and decoder feature maps by refining them through multiple convolutional layers. Each dense block combines outputs from earlier layers and upsampled features, ensuring better feature fusion.
+
+![Forward]({{ '/assets/images/27/forward.png' | relative_url }})
+
+- **Deep Supervision**:
+   UNet++ enables deep supervision by generating outputs at multiple levels of the decoder. This approach ensures better gradient flow during training and allows the model to operate in two modes during inference:
+   - **Accurate Mode**: Combines outputs from all decoder levels for precise segmentation.
+   - **Fast Mode**: Uses a single decoder level for quicker inference, trading off some accuracy for speed.
+
+![DeepSupervision]({{ '/assets/images/27/deep_supervision.png' | relative_url }})
+
+#### Implementation
+
+Below is a basic implementation of the UNet++ architecture (replace this placeholder with the provided code):
+
+```python
+class VGGBlock(nn.Module):
+    def __init__(self, in_channels, middle_channels, out_channels):
+        super().__init__()
+        self.relu = nn.ReLU(inplace=True)
+        self.conv1 = nn.Conv2d(in_channels, middle_channels, 3, padding=1)
+        self.bn1 = nn.BatchNorm2d(middle_channels)
+        self.conv2 = nn.Conv2d(middle_channels, out_channels, 3, padding=1)
+        self.bn2 = nn.BatchNorm2d(out_channels)
+
+    def forward(self, x):
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+
+        out = self.conv2(out)
+        out = self.bn2(out)
+        out = self.relu(out)
+
+        return out
+
+class NestedUNet(nn.Module):
+    def __init__(self, num_classes, input_channels=3, deep_supervision=False, **kwargs):
+        super().__init__()
+
+        nb_filter = [32, 64, 128, 256, 512]
+
+        self.deep_supervision = deep_supervision
+
+        self.pool = nn.MaxPool2d(2, 2)
+        self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+
+        self.conv0_0 = VGGBlock(input_channels, nb_filter[0], nb_filter[0])
+        self.conv1_0 = VGGBlock(nb_filter[0], nb_filter[1], nb_filter[1])
+        self.conv2_0 = VGGBlock(nb_filter[1], nb_filter[2], nb_filter[2])
+        self.conv3_0 = VGGBlock(nb_filter[2], nb_filter[3], nb_filter[3])
+        self.conv4_0 = VGGBlock(nb_filter[3], nb_filter[4], nb_filter[4])
+
+        self.conv0_1 = VGGBlock(nb_filter[0]+nb_filter[1], nb_filter[0], nb_filter[0])
+        self.conv1_1 = VGGBlock(nb_filter[1]+nb_filter[2], nb_filter[1], nb_filter[1])
+        self.conv2_1 = VGGBlock(nb_filter[2]+nb_filter[3], nb_filter[2], nb_filter[2])
+        self.conv3_1 = VGGBlock(nb_filter[3]+nb_filter[4], nb_filter[3], nb_filter[3])
+
+        self.conv0_2 = VGGBlock(nb_filter[0]*2+nb_filter[1], nb_filter[0], nb_filter[0])
+        self.conv1_2 = VGGBlock(nb_filter[1]*2+nb_filter[2], nb_filter[1], nb_filter[1])
+        self.conv2_2 = VGGBlock(nb_filter[2]*2+nb_filter[3], nb_filter[2], nb_filter[2])
+
+        self.conv0_3 = VGGBlock(nb_filter[0]*3+nb_filter[1], nb_filter[0], nb_filter[0])
+        self.conv1_3 = VGGBlock(nb_filter[1]*3+nb_filter[2], nb_filter[1], nb_filter[1])
+
+        self.conv0_4 = VGGBlock(nb_filter[0]*4+nb_filter[1], nb_filter[0], nb_filter[0])
+
+        if self.deep_supervision:
+            self.final1 = nn.Conv2d(nb_filter[0], num_classes, kernel_size=1)
+            self.final2 = nn.Conv2d(nb_filter[0], num_classes, kernel_size=1)
+            self.final3 = nn.Conv2d(nb_filter[0], num_classes, kernel_size=1)
+            self.final4 = nn.Conv2d(nb_filter[0], num_classes, kernel_size=1)
+        else:
+            self.final = nn.Conv2d(nb_filter[0], num_classes, kernel_size=1)
+
+
+    def forward(self, input):
+        x0_0 = self.conv0_0(input)
+        x1_0 = self.conv1_0(self.pool(x0_0))
+        x0_1 = self.conv0_1(torch.cat([x0_0, self.up(x1_0)], 1))
+
+        x2_0 = self.conv2_0(self.pool(x1_0))
+        x1_1 = self.conv1_1(torch.cat([x1_0, self.up(x2_0)], 1))
+        x0_2 = self.conv0_2(torch.cat([x0_0, x0_1, self.up(x1_1)], 1))
+
+        x3_0 = self.conv3_0(self.pool(x2_0))
+        x2_1 = self.conv2_1(torch.cat([x2_0, self.up(x3_0)], 1))
+        x1_2 = self.conv1_2(torch.cat([x1_0, x1_1, self.up(x2_1)], 1))
+        x0_3 = self.conv0_3(torch.cat([x0_0, x0_1, x0_2, self.up(x1_2)], 1))
+
+        x4_0 = self.conv4_0(self.pool(x3_0))
+        x3_1 = self.conv3_1(torch.cat([x3_0, self.up(x4_0)], 1))
+        x2_2 = self.conv2_2(torch.cat([x2_0, x2_1, self.up(x3_1)], 1))
+        x1_3 = self.conv1_3(torch.cat([x1_0, x1_1, x1_2, self.up(x2_2)], 1))
+        x0_4 = self.conv0_4(torch.cat([x0_0, x0_1, x0_2, x0_3, self.up(x1_3)], 1))
+
+        if self.deep_supervision:
+            output1 = self.final1(x0_1)
+            output2 = self.final2(x0_2)
+            output3 = self.final3(x0_3)
+            output4 = self.final4(x0_4)
+            return [output1, output2, output3, output4]
+
+        else:
+            output = self.final(x0_4)
+            return output
+```
+
 ### Training
+
+Training UNet++ involves carefully balancing the challenges of pixel-level accuracy and overall segmentation shape coherence. To achieve this, the training process leverages a **combined loss function** that integrates **Binary Cross-Entropy (BCE)** and **Dice Loss**. Let’s explore these components and their implementation in the training pipeline.
+
+
+
+#### Combined Loss Function
+
+The loss function used in UNet++ combines two key components:
+
+1. **Binary Cross-Entropy (BCE)**: 
+   - BCE ensures pixel-wise accuracy by penalizing incorrect predictions at the binary level.
+   - It is particularly effective in handling class imbalances, where background pixels vastly outnumber foreground pixels.
+
+2. **Dice Loss**:
+   - Dice Loss focuses on maximizing the overlap between predicted segmentation masks and ground truth masks.
+   - It ensures better shape preservation and structural accuracy in the segmentation output.
+
+The combined loss is mathematically expressed as:
+
+![Loss]({{ '/assets/images/27/loss.png' | relative_url }})
+
+#### Code for Loss
+
+Below is a code snippet illustrating the loss computation and training loop (replace this placeholder with the provided code):
+
+```python
+# Placeholder for training loop with deep supervision
+import torch
+import torch.nn.functional as F
+from torch.nn import Module
+
+EPSILON = 1e-6
+
+class DiceLoss(Module):
+    def __init__(self):
+        super().__init__()
+    
+    def forward(self, pred, mask):
+        # Ensure size compatibility
+        if pred.shape != mask.shape:
+            raise ValueError(f"Shape mismatch: pred {pred.shape} vs mask {mask.shape}")
+        # Flatten tensors for Dice computation
+        pred = pred.flatten()
+        mask = mask.flatten()
+        # Compute intersection and Dice score
+        intersect = (mask * pred).sum()
+        dice_score = 2 * intersect / (pred.sum() + mask.sum() + EPSILON)
+        dice_loss = 1 - dice_score
+        return dice_loss
+
+class CombinedLoss(Module):
+    def __init__(self, weight_dice=0.2, weight_bce=0.8):
+        super().__init__()
+        self.weight_dice = weight_dice
+        self.weight_bce = weight_bce
+        self.dice_loss = DiceLoss()
+        self.bce_loss = torch.nn.BCEWithLogitsLoss()
+    
+    def forward(self, pred, mask):
+        # Ensure the predicted and target sizes are compatible
+        if pred.shape[1:] != mask.shape[1:]:
+            raise ValueError(f"Shape mismatch: pred {pred.shape} vs mask {mask.shape}")
+        
+        if pred.shape[1] == 1 and mask.dim() == 3:  # Handle (B, H, W) vs (B, C, H, W)
+            mask = mask.unsqueeze(1)
+        
+        dice = self.dice_loss(torch.sigmoid(pred), mask) # Dice loss
+        bce = self.bce_loss(pred, mask)         # BCEWithLogitsLoss
+        combined_loss = self.weight_dice * dice + self.weight_bce * bce         # Weighted sum of Dice and BCEWithLogitsLoss
+        return combined_loss
+
+# Example usage
+criterion = CombinedLoss(weight_dice=0.2, weight_bce=0.8)
+```
+
+The training process for UNet++ involves iterating over batches of input images and segmentation masks, computing the combined loss, and updating the model parameters using backpropagation. Below is the PyTorch-based training loop:
+
+```python
+for epoch in range(EPOCHS):
+    model.train()
+    epoch_loss = 0.0
+
+    with tqdm(total=len(dataloader), desc=f'Epoch {epoch+1}/{EPOCHS}', position=0, leave=True) as pbar:
+        for step, (images, masks) in enumerate(dataloader):
+            images = images.to(device)
+            masks = masks.to(device)
+
+            optimizer.zero_grad()
+            predictions = model(images)
+
+            loss = criterion(predictions, masks)
+            loss.backward()
+            optimizer.step()
+
+            epoch_loss += loss.item()
+            # Update progress bar
+            pbar.update(1)
+            pbar.set_postfix(loss=loss.item())
+
+    avg_loss = epoch_loss / len(dataloader)
+    print(f"Epoch {epoch+1} Average Loss: {avg_loss:.4f}")
+```
+#### Advantages of Combined Loss
+
+By integrating BCE and Dice Loss, the training process ensures:
+
+- Pixel-Level Accuracy: BCE Loss handles small-scale details effectively.
+- Shape and Structure Preservation: Dice Loss maintains the overall consistency of segmentation masks.
+- This combination proves to be highly effective for medical segmentation tasks, particularly in handling complex structures and class imbalances
+
+
 ### Results
-### Discussion
+
+#### Evaluation Metrics
+
+The performance of the UNet++ model was evaluated using two key metrics: the **Mean Dice Coefficient** and the **Mean Intersection over Union (IoU)**. These metrics measure the overlap between the predicted segmentation masks and the ground truth masks.
+
+
+1. **Dice Coefficient (DSC):** Measures the overlap between predicted and ground truth masks. A higher value indicates better segmentation.
+2. **Intersection over Union (IoU):** Computes the ratio of the intersection and union of predicted and ground truth masks. 
+
+
+| Metric                  | Score   |
+| :----------------------- | :-----: |
+| **Mean Dice Coefficient** | 0.7839 |
+| **Mean IoU**             | 0.6854 |
+
+
+
+
+#### Prediction
+
+![Segmentation Result]({{ '/assets/images/27/results.png' | relative_url }})
+<!-- {: style="width: 400px; max-width: 100%;"} -->
+
+#### Discussion
+UNet++ demonstrates significant improvements over traditional UNet for medical segmentation tasks, owing to its architectural innovations and advanced training strategies. With its ability to generate accurate and reliable segmentations, it remains a powerful tool in the domain of medical image analysis.
+
 
 
 
